@@ -1,0 +1,2 @@
+# JURA12x12
+Aplikacja JURA12x12
