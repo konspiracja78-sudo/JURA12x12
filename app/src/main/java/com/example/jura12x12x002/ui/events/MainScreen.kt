@@ -58,7 +58,10 @@ import com.google.firebase.firestore.FirebaseFirestore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(onLogout: () -> Unit) {
+fun MainScreen(
+    onLogout: () -> Unit,
+    onOpenEvent: (String) -> Unit
+) {
     val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
@@ -66,7 +69,6 @@ fun MainScreen(onLogout: () -> Unit) {
     val allEvents = remember { mutableStateListOf<Event>() }
 
     var showAddDialog by remember { mutableStateOf(false) }
-    var selectedEventId by remember { mutableStateOf<String?>(null) }
     var isEventsLoading by remember { mutableStateOf(true) }
     var isAddingEvent by remember { mutableStateOf(false) }
     var selectedFilterIndex by remember { mutableStateOf(0) }
@@ -100,14 +102,6 @@ fun MainScreen(onLogout: () -> Unit) {
         onDispose {
             listener.remove()
         }
-    }
-
-    if (selectedEventId != null) {
-        EventDetailsScreen(
-            eventId = selectedEventId!!,
-            onBack = { selectedEventId = null }
-        )
-        return
     }
 
     val sortedEvents = allEvents.sortedBy(::parseDateTime)
@@ -256,7 +250,7 @@ fun MainScreen(onLogout: () -> Unit) {
                             EventCard(
                                 event = event,
                                 currentUserEmail = auth.currentUser?.email ?: "",
-                                onClick = { selectedEventId = event.id }
+                                onClick = { onOpenEvent(event.id) }
                             )
                         }
                     }
@@ -278,7 +272,7 @@ fun MainScreen(onLogout: () -> Unit) {
                             EventCard(
                                 event = event,
                                 currentUserEmail = auth.currentUser?.email ?: "",
-                                onClick = { selectedEventId = event.id }
+                                onClick = { onOpenEvent(event.id) }
                             )
                         }
                     }
