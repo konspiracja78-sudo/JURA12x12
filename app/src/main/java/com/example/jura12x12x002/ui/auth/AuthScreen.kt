@@ -1,24 +1,47 @@
 package com.example.jura12x12x002.ui.auth
 
+import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jura12x12x002.di.LocalAppContainer
+import com.example.jura12x12x002.di.authViewModelFactory
 
 @Composable
-fun AuthScreen(onAuthSuccess: () -> Unit) {
-    var isRegisterMode by remember { mutableStateOf(false) }
+fun AuthScreen() {
+    val context = LocalContext.current
+    val container = LocalAppContainer.current
+    val viewModel: AuthViewModel = viewModel(
+        factory = authViewModelFactory(container)
+    )
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    if (isRegisterMode) {
+    LaunchedEffect(viewModel) {
+        viewModel.messages.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    if (uiState.isRegisterMode) {
         RegisterScreen(
-            onRegisterSuccess = onAuthSuccess,
-            onGoToLogin = { isRegisterMode = false }
+            state = uiState,
+            onEmailChange = viewModel::onRegisterEmailChange,
+            onPasswordChange = viewModel::onRegisterPasswordChange,
+            onRepeatPasswordChange = viewModel::onRegisterRepeatPasswordChange,
+            onRegister = viewModel::register,
+            onGoToLogin = viewModel::showLogin
         )
     } else {
         LoginScreen(
-            onLoginSuccess = onAuthSuccess,
-            onGoToRegister = { isRegisterMode = true }
+            state = uiState,
+            onEmailChange = viewModel::onLoginEmailChange,
+            onPasswordChange = viewModel::onLoginPasswordChange,
+            onLogin = viewModel::login,
+            onResetPassword = viewModel::resetPassword,
+            onGoToRegister = viewModel::showRegister
         )
     }
 }

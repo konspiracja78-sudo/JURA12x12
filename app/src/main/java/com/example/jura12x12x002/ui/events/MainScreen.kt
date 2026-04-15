@@ -30,9 +30,8 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,80 +40,59 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jura12x12x002.di.LocalAppContainer
+import com.example.jura12x12x002.di.mainViewModelFactory
 import com.example.jura12x12x002.model.EVENT_STATUS_ACTIVE
 import com.example.jura12x12x002.model.EVENT_STATUS_CANCELLED
 import com.example.jura12x12x002.model.EVENT_TYPE_PANEL
 import com.example.jura12x12x002.model.EVENT_TYPE_ROCKS
-import com.example.jura12x12x002.model.Event
 import com.example.jura12x12x002.ui.components.EventCard
 import com.example.jura12x12x002.ui.components.SectionHeader
 import com.example.jura12x12x002.ui.theme.JuraLight
 import com.example.jura12x12x002.ui.theme.JuraRock
 import com.example.jura12x12x002.ui.theme.JuraWarmBrown
 import com.example.jura12x12x002.utils.isCancelled
-import com.example.jura12x12x002.utils.parseDateTime
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    onLogout: () -> Unit,
     onOpenEvent: (String) -> Unit
 ) {
-    val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
-    val auth = FirebaseAuth.getInstance()
-
-    val allEvents = remember { mutableStateListOf<Event>() }
+    val container = LocalAppContainer.current
+    val viewModel: MainViewModel = viewModel(
+        factory = mainViewModelFactory(container)
+    )
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }
-    var isEventsLoading by remember { mutableStateOf(true) }
-    var isAddingEvent by remember { mutableStateOf(false) }
-    var selectedFilterIndex by remember { mutableStateOf(0) }
-    var searchQuery by remember { mutableStateOf("") }
-
     val filterOptions = listOf("Wszystkie", EVENT_STATUS_ACTIVE, EVENT_STATUS_CANCELLED)
 
-    DisposableEffect(db, context) {
-        val listener = db.collection("events")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    isEventsLoading = false
-                    Toast.makeText(
-                        context,
-                        "Błąd pobierania wydarzeń: ${error.message ?: "nieznany błąd"}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    return@addSnapshotListener
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is MainUiEffect.ShowMessage -> {
+                    Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
                 }
-
-                if (snapshot != null) {
-                    isEventsLoading = false
-                    allEvents.clear()
-
-                    snapshot.documents
-                        .mapNotNull { doc -> doc.toObject(Event::class.java)?.copy(id = doc.id) }
-                        .forEach(allEvents::add)
+                MainUiEffect.EventSaved -> {
+                    showAddDialog = false
                 }
             }
-
-        onDispose {
-            listener.remove()
         }
     }
 
-    val sortedEvents = allEvents.sortedBy(::parseDateTime)
-    val filteredByStatus = when (filterOptions[selectedFilterIndex]) {
-        EVENT_STATUS_ACTIVE -> sortedEvents.filter { !isCancelled(it) }
-        EVENT_STATUS_CANCELLED -> sortedEvents.filter(::isCancelled)
-        else -> sortedEvents
+    val filteredByStatus = when (filterOptions[uiState.selectedFilterIndex]) {
+        EVENT_STATUS_ACTIVE -> uiState.allEvents.filter { !isCancelled(it) }
+        EVENT_STATUS_CANCELLED -> uiState.allEvents.filter(::isCancelled)
+        else -> uiState.allEvents
     }
 
-    val filteredEvents = if (searchQuery.isBlank()) {
+    val filteredEvents = if (uiState.searchQuery.isBlank()) {
         filteredByStatus
     } else {
-        val query = searchQuery.trim().lowercase()
+        val query = uiState.searchQuery.trim().lowercase()
         filteredByStatus.filter { event ->
             event.title.lowercase().contains(query) ||
                 event.location.lowercase().contains(query) ||
@@ -131,7 +109,7 @@ fun MainScreen(
                 title = { Text("JURA12x12") },
                 actions = {
                     Button(
-                        onClick = onLogout,
+                        onClick = viewModel::logout,
                         modifier = Modifier.padding(end = 8.dp)
                     ) {
                         Text("Wyloguj")
@@ -142,7 +120,7 @@ fun MainScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    if (!isAddingEvent) {
+                    if (!uiState.isAddingEvent) {
                         showAddDialog = true
                     }
                 },
@@ -177,9 +155,9 @@ fun MainScreen(
                             count = filterOptions.size
                         ),
                         onClick = {
-                            selectedFilterIndex = index
+                            viewModel.onFilterSelected(index)
                         },
-                        selected = index == selectedFilterIndex
+                        selected = index == uiState.selectedFilterIndex
                     ) {
                         Text(label)
                     }
@@ -194,8 +172,8 @@ fun MainScreen(
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
+                    value = uiState.searchQuery,
+                    onValueChange = viewModel::onSearchQueryChange,
                     label = { Text("Szukaj: cel / miejsce / miasto") },
                     leadingIcon = {
                         Icon(
@@ -213,7 +191,7 @@ fun MainScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (isEventsLoading) {
+            if (uiState.isLoading) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
@@ -223,7 +201,7 @@ fun MainScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("Ładowanie wydarzeń...")
-            } else if (allEvents.isEmpty()) {
+            } else if (uiState.allEvents.isEmpty()) {
                 Text("Brak wydarzeń w bazie")
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Dodaj pierwsze wydarzenie przyciskiem +")
@@ -249,7 +227,7 @@ fun MainScreen(
                         ) { event ->
                             EventCard(
                                 event = event,
-                                currentUserEmail = auth.currentUser?.email ?: "",
+                                currentUserEmail = uiState.currentUserEmail,
                                 onClick = { onOpenEvent(event.id) }
                             )
                         }
@@ -271,7 +249,7 @@ fun MainScreen(
                         ) { event ->
                             EventCard(
                                 event = event,
-                                currentUserEmail = auth.currentUser?.email ?: "",
+                                currentUserEmail = uiState.currentUserEmail,
                                 onClick = { onOpenEvent(event.id) }
                             )
                         }
@@ -285,42 +263,14 @@ fun MainScreen(
         EventFormDialog(
             dialogTitle = "Nowe wydarzenie",
             initialEvent = null,
-            confirmButtonText = if (isAddingEvent) "Dodawanie..." else "Dodaj",
-            isSaving = isAddingEvent,
+            confirmButtonText = if (uiState.isAddingEvent) "Dodawanie..." else "Dodaj",
+            isSaving = uiState.isAddingEvent,
             onDismiss = {
-                if (!isAddingEvent) {
+                if (!uiState.isAddingEvent) {
                     showAddDialog = false
                 }
             },
-            onSave = { event ->
-                if (isAddingEvent) return@EventFormDialog
-
-                val currentUserEmail = auth.currentUser?.email ?: ""
-                val eventToSave = event.copy(
-                    id = "",
-                    authorEmail = currentUserEmail,
-                    status = EVENT_STATUS_ACTIVE,
-                    statusReason = ""
-                )
-
-                isAddingEvent = true
-
-                db.collection("events")
-                    .add(eventToSave)
-                    .addOnSuccessListener {
-                        isAddingEvent = false
-                        showAddDialog = false
-                        Toast.makeText(context, "Dodano wydarzenie", Toast.LENGTH_SHORT).show()
-                    }
-                    .addOnFailureListener { e ->
-                        isAddingEvent = false
-                        Toast.makeText(
-                            context,
-                            "Błąd dodawania wydarzenia: ${e.message ?: "nieznany błąd"}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-            }
+            onSave = viewModel::addEvent
         )
     }
 }

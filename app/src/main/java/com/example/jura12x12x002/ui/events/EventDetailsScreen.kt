@@ -34,10 +34,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,11 +44,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.jura12x12x002.model.ChatMessage
-import com.example.jura12x12x002.model.EVENT_STATUS_ACTIVE
-import com.example.jura12x12x002.model.EVENT_STATUS_CANCELLED
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jura12x12x002.di.LocalAppContainer
+import com.example.jura12x12x002.di.eventDetailsViewModelFactory
 import com.example.jura12x12x002.model.EVENT_TYPE_ROCKS
-import com.example.jura12x12x002.model.Event
 import com.example.jura12x12x002.ui.components.ChatBubble
 import com.example.jura12x12x002.ui.components.InfoLine
 import com.example.jura12x12x002.ui.components.StatusChip
@@ -58,10 +56,6 @@ import com.example.jura12x12x002.ui.theme.JuraCardBackground
 import com.example.jura12x12x002.ui.theme.JuraLight
 import com.example.jura12x12x002.ui.theme.JuraWarmBrown
 import com.example.jura12x12x002.utils.isCancelled
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,84 +64,39 @@ fun EventDetailsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val db = FirebaseFirestore.getInstance()
-    val auth = FirebaseAuth.getInstance()
-    val currentUserEmail = auth.currentUser?.email ?: ""
-
-    var currentEvent by remember { mutableStateOf<Event?>(null) }
-    val messages = remember { mutableStateListOf<ChatMessage>() }
+    val container = LocalAppContainer.current
+    val viewModel: EventDetailsViewModel = viewModel(
+        factory = eventDetailsViewModelFactory(container, eventId)
+    )
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val chatListState = rememberLazyListState()
 
-    var newMessage by remember { mutableStateOf("") }
     var showEditDialog by remember { mutableStateOf(false) }
     var showCancelDialog by remember { mutableStateOf(false) }
-    var isEventLoading by remember { mutableStateOf(true) }
-    var isEditingEvent by remember { mutableStateOf(false) }
-    var isSendingMessage by remember { mutableStateOf(false) }
-    var isUpdatingStatus by remember { mutableStateOf(false) }
 
-    DisposableEffect(eventId, db, context) {
-        val eventListener = db.collection("events")
-            .document(eventId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    isEventLoading = false
-                    Toast.makeText(
-                        context,
-                        "Błąd wydarzenia: ${error.message ?: "nieznany błąd"}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    return@addSnapshotListener
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is EventDetailsUiEffect.ShowMessage -> {
+                    Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
                 }
-
-                if (snapshot != null && snapshot.exists()) {
-                    isEventLoading = false
-                    val loadedEvent = snapshot.toObject(Event::class.java)
-                    if (loadedEvent != null) {
-                        currentEvent = loadedEvent.copy(id = snapshot.id)
-                    }
-                } else {
-                    isEventLoading = false
+                EventDetailsUiEffect.CloseEditDialog -> {
+                    showEditDialog = false
+                }
+                EventDetailsUiEffect.CloseCancelDialog -> {
+                    showCancelDialog = false
                 }
             }
-
-        val messagesListener = db.collection("events")
-            .document(eventId)
-            .collection("messages")
-            .orderBy("createdAt")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Toast.makeText(
-                        context,
-                        "Błąd czatu: ${error.message ?: "nieznany błąd"}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    return@addSnapshotListener
-                }
-
-                if (snapshot != null) {
-                    messages.clear()
-                    messages.addAll(
-                        snapshot.documents.mapNotNull { doc ->
-                            doc.toObject(ChatMessage::class.java)
-                        }
-                    )
-                }
-            }
-
-        onDispose {
-            eventListener.remove()
-            messagesListener.remove()
         }
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            chatListState.animateScrollToItem(messages.lastIndex)
+    LaunchedEffect(uiState.messages.size) {
+        if (uiState.messages.isNotEmpty()) {
+            chatListState.animateScrollToItem(uiState.messages.lastIndex)
         }
     }
 
-    if (isEventLoading) {
+    if (uiState.isEventLoading) {
         EventDetailsStateScaffold(onBack = onBack) {
             Column(
                 modifier = Modifier
@@ -162,7 +111,7 @@ fun EventDetailsScreen(
         return
     }
 
-    val event = currentEvent
+    val event = uiState.currentEvent
 
     if (event == null) {
         EventDetailsStateScaffold(onBack = onBack) {
@@ -178,8 +127,8 @@ fun EventDetailsScreen(
     }
 
     val cancelled = isCancelled(event)
-    val isJoined = currentUserEmail.isNotBlank() && event.participantEmails.contains(currentUserEmail)
-    val isAuthor = event.authorEmail.isNotBlank() && event.authorEmail == currentUserEmail
+    val isJoined = uiState.currentUserEmail.isNotBlank() && event.participantEmails.contains(uiState.currentUserEmail)
+    val isAuthor = event.authorEmail.isNotBlank() && event.authorEmail == uiState.currentUserEmail
 
     Scaffold(
         topBar = {
@@ -197,7 +146,7 @@ fun EventDetailsScreen(
                     if (isAuthor && !cancelled) {
                         IconButton(
                             onClick = {
-                                if (!isEditingEvent) {
+                                if (!uiState.isEditingEvent) {
                                     showEditDialog = true
                                 }
                             }
@@ -227,8 +176,8 @@ fun EventDetailsScreen(
                         .padding(12.dp)
                 ) {
                     OutlinedTextField(
-                        value = newMessage,
-                        onValueChange = { newMessage = it },
+                        value = uiState.newMessage,
+                        onValueChange = viewModel::onMessageChange,
                         label = { Text("Napisz wiadomość") },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -236,62 +185,11 @@ fun EventDetailsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Button(
-                        onClick = {
-                            if (cancelled) {
-                                Toast.makeText(context, "Czat jest zablokowany dla odwołanego wydarzenia", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-
-                            if (isSendingMessage) return@Button
-
-                            if (event.id.isBlank()) {
-                                Toast.makeText(context, "Brak ID wydarzenia", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-
-                            if (newMessage.isBlank()) {
-                                Toast.makeText(context, "Wpisz wiadomość", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-
-                            isSendingMessage = true
-
-                            val message = ChatMessage(
-                                text = newMessage.trim(),
-                                authorEmail = auth.currentUser?.email ?: "Brak emaila",
-                                createdAt = System.currentTimeMillis()
-                            )
-
-                            db.collection("events")
-                                .document(event.id)
-                                .collection("messages")
-                                .add(message)
-                                .addOnSuccessListener {
-                                    db.collection("events")
-                                        .document(event.id)
-                                        .update("chatCount", FieldValue.increment(1))
-                                        .addOnSuccessListener {
-                                            isSendingMessage = false
-                                            newMessage = ""
-                                        }
-                                        .addOnFailureListener {
-                                            isSendingMessage = false
-                                            newMessage = ""
-                                        }
-                                }
-                                .addOnFailureListener { e ->
-                                    isSendingMessage = false
-                                    Toast.makeText(
-                                        context,
-                                        "Błąd wysyłki: ${e.message ?: "nieznany błąd"}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                        },
+                        onClick = viewModel::sendMessage,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = !isSendingMessage
+                        enabled = !uiState.isSendingMessage
                     ) {
-                        Text(if (isSendingMessage) "Wysyłanie..." else "Wyślij")
+                        Text(if (uiState.isSendingMessage) "Wysyłanie..." else "Wyślij")
                     }
                 }
             }
@@ -419,42 +317,7 @@ fun EventDetailsScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Button(
-                        onClick = {
-                            if (cancelled) {
-                                Toast.makeText(context, "Nie można dołączyć do odwołanego wydarzenia", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-
-                            if (currentUserEmail.isBlank()) {
-                                Toast.makeText(context, "Brak zalogowanego emaila", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-
-                            db.collection("events")
-                                .document(event.id)
-                                .update(
-                                    "participantEmails",
-                                    if (isJoined) {
-                                        FieldValue.arrayRemove(currentUserEmail)
-                                    } else {
-                                        FieldValue.arrayUnion(currentUserEmail)
-                                    }
-                                )
-                                .addOnSuccessListener {
-                                    Toast.makeText(
-                                        context,
-                                        if (isJoined) "Opuściłeś wydarzenie" else "Dołączyłeś do wydarzenia",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                                .addOnFailureListener { e ->
-                                    Toast.makeText(
-                                        context,
-                                        "Błąd zapisu uczestnika: ${e.message ?: "nieznany błąd"}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                        },
+                        onClick = viewModel::toggleParticipation,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(if (isJoined) "Opuść wydarzenie" else "Dołącz do wydarzenia")
@@ -465,7 +328,7 @@ fun EventDetailsScreen(
 
                         Button(
                             onClick = {
-                                if (!isEditingEvent) {
+                                if (!uiState.isEditingEvent) {
                                     showEditDialog = true
                                 }
                             },
@@ -481,36 +344,9 @@ fun EventDetailsScreen(
 
                     Button(
                         onClick = {
-                            if (isUpdatingStatus) return@Button
-
+                            if (uiState.isUpdatingStatus) return@Button
                             if (cancelled) {
-                                isUpdatingStatus = true
-
-                                db.collection("events")
-                                    .document(event.id)
-                                    .set(
-                                        mapOf(
-                                            "status" to EVENT_STATUS_ACTIVE,
-                                            "statusReason" to ""
-                                        ),
-                                        SetOptions.merge()
-                                    )
-                                    .addOnSuccessListener {
-                                        currentEvent = event.copy(
-                                            status = EVENT_STATUS_ACTIVE,
-                                            statusReason = ""
-                                        )
-                                        isUpdatingStatus = false
-                                        Toast.makeText(context, "Przywrócono wydarzenie", Toast.LENGTH_SHORT).show()
-                                    }
-                                    .addOnFailureListener { e ->
-                                        isUpdatingStatus = false
-                                        Toast.makeText(
-                                            context,
-                                            "Błąd przywracania: ${e.message ?: "nieznany błąd"}",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    }
+                                viewModel.restoreEvent()
                             } else {
                                 showCancelDialog = true
                             }
@@ -518,7 +354,7 @@ fun EventDetailsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            if (isUpdatingStatus) {
+                            if (uiState.isUpdatingStatus) {
                                 "Zapisywanie..."
                             } else {
                                 if (cancelled) "Przywróć wydarzenie" else "Odwołaj wydarzenie"
@@ -539,19 +375,19 @@ fun EventDetailsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            if (messages.isEmpty()) {
+            if (uiState.messages.isEmpty()) {
                 item {
                     Text("Brak wiadomości")
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             } else {
                 items(
-                    items = messages,
+                    items = uiState.messages,
                     key = { "${it.authorEmail}_${it.createdAt}_${it.text}" }
                 ) { message ->
                     ChatBubble(
                         message = message,
-                        isMine = currentUserEmail.isNotBlank() && message.authorEmail == currentUserEmail
+                        isMine = uiState.currentUserEmail.isNotBlank() && message.authorEmail == uiState.currentUserEmail
                     )
                 }
             }
@@ -566,100 +402,26 @@ fun EventDetailsScreen(
         EventFormDialog(
             dialogTitle = "Edytuj wydarzenie",
             initialEvent = event,
-            confirmButtonText = if (isEditingEvent) "Zapisywanie..." else "Zapisz",
-            isSaving = isEditingEvent,
+            confirmButtonText = if (uiState.isEditingEvent) "Zapisywanie..." else "Zapisz",
+            isSaving = uiState.isEditingEvent,
             onDismiss = {
-                if (!isEditingEvent) {
+                if (!uiState.isEditingEvent) {
                     showEditDialog = false
                 }
             },
-            onSave = { updatedEvent ->
-                if (!isAuthor) {
-                    Toast.makeText(context, "Tylko autor może edytować wydarzenie", Toast.LENGTH_SHORT).show()
-                    return@EventFormDialog
-                }
-
-                if (isEditingEvent) return@EventFormDialog
-
-                val updateData = hashMapOf<String, Any>(
-                    "title" to updatedEvent.title,
-                    "location" to updatedEvent.location,
-                    "date" to updatedEvent.date,
-                    "type" to updatedEvent.type,
-                    "timeInfo" to updatedEvent.timeInfo,
-                    "city" to updatedEvent.city,
-                    "authorEmail" to event.authorEmail,
-                    "status" to event.status,
-                    "statusReason" to event.statusReason
-                )
-
-                isEditingEvent = true
-
-                db.collection("events")
-                    .document(event.id)
-                    .update(updateData)
-                    .addOnSuccessListener {
-                        isEditingEvent = false
-                        showEditDialog = false
-                        Toast.makeText(context, "Zapisano zmiany", Toast.LENGTH_SHORT).show()
-                    }
-                    .addOnFailureListener { e ->
-                        isEditingEvent = false
-                        Toast.makeText(
-                            context,
-                            "Błąd edycji: ${e.message ?: "nieznany błąd"}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-            }
+            onSave = viewModel::updateEvent
         )
     }
 
     if (showCancelDialog) {
         CancelEventDialog(
             onDismiss = {
-                if (!isUpdatingStatus) {
+                if (!uiState.isUpdatingStatus) {
                     showCancelDialog = false
                 }
             },
-            onConfirm = { reason ->
-                if (!isAuthor) {
-                    Toast.makeText(context, "Tylko autor może odwołać wydarzenie", Toast.LENGTH_SHORT).show()
-                    return@CancelEventDialog
-                }
-
-                if (isUpdatingStatus) return@CancelEventDialog
-
-                isUpdatingStatus = true
-
-                db.collection("events")
-                    .document(event.id)
-                    .set(
-                        mapOf(
-                            "status" to EVENT_STATUS_CANCELLED,
-                            "statusReason" to reason.trim()
-                        ),
-                        SetOptions.merge()
-                    )
-                    .addOnSuccessListener {
-                        currentEvent = event.copy(
-                            status = EVENT_STATUS_CANCELLED,
-                            statusReason = reason.trim()
-                        )
-                        isUpdatingStatus = false
-                        showCancelDialog = false
-                        Toast.makeText(context, "Wydarzenie zostało odwołane", Toast.LENGTH_SHORT).show()
-                    }
-                    .addOnFailureListener { e ->
-                        isUpdatingStatus = false
-                        Toast.makeText(
-                            context,
-                            "Błąd odwołania: ${e.message ?: "nieznany błąd"}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-            },
-            isSaving = isUpdatingStatus
+            onConfirm = viewModel::cancelEvent,
+            isSaving = uiState.isUpdatingStatus
         )
     }
 }
