@@ -1,16 +1,16 @@
 package com.example.jura12x12x002.utils
 
-import com.example.jura12x12x002.model.EVENT_STATUS_CANCELLED
-import com.example.jura12x12x002.model.EVENT_TYPE_ROCKS
 import com.example.jura12x12x002.model.Event
-import com.example.jura12x12x002.model.ROCKS_TIME_PREFIX
+import com.example.jura12x12x002.model.extractRocksDepartureTime
+import com.example.jura12x12x002.model.isCancelledStatus
+import com.example.jura12x12x002.model.isRocksType
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 fun parseDateTime(event: Event): Long {
     return try {
-        val timePart = if (event.type == EVENT_TYPE_ROCKS) {
-            event.timeInfo.removePrefix(ROCKS_TIME_PREFIX).trim()
+        val timePart = if (event.isRocksType()) {
+            extractRocksDepartureTime(event.timeInfo)
         } else {
             event.timeInfo.split(" - ").firstOrNull()?.trim() ?: "00:00"
         }
@@ -26,4 +26,4 @@ fun parseDateTime(event: Event): Long {
 
 fun sanitizeEmail(email: String): String = email.trim()
 
-fun isCancelled(event: Event): Boolean = event.status == EVENT_STATUS_CANCELLED
+fun isCancelled(event: Event): Boolean = event.isCancelledStatus()

@@ -9,6 +9,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jura12x12x002.di.LocalAppContainer
 import com.example.jura12x12x002.di.authViewModelFactory
+import com.example.jura12x12x002.ui.asString
 
 @Composable
 fun AuthScreen() {
@@ -21,7 +22,7 @@ fun AuthScreen() {
 
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { message ->
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            Toast.makeText(context, message.asString(context), Toast.LENGTH_LONG).show()
         }
     }
 

@@ -2,12 +2,14 @@ package com.example.jura12x12x002.ui.events
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.jura12x12x002.R
 import com.example.jura12x12x002.domain.usecase.auth.LogoutUseCase
 import com.example.jura12x12x002.domain.usecase.auth.ObserveAuthStateUseCase
 import com.example.jura12x12x002.domain.usecase.event.AddEventUseCase
 import com.example.jura12x12x002.domain.usecase.event.ObserveEventsUseCase
 import com.example.jura12x12x002.model.EVENT_STATUS_ACTIVE
 import com.example.jura12x12x002.model.Event
+import com.example.jura12x12x002.ui.UiText
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -28,7 +30,7 @@ data class MainUiState(
 )
 
 sealed interface MainUiEffect {
-    data class ShowMessage(val message: String) : MainUiEffect
+    data class ShowMessage(val message: UiText) : MainUiEffect
     data object EventSaved : MainUiEffect
 }
 
@@ -59,7 +61,10 @@ class MainViewModel(
                     _uiState.update { state -> state.copy(isLoading = false) }
                     emitEffect(
                         MainUiEffect.ShowMessage(
-                            "Błąd pobierania wydarzeń: ${error.message ?: "nieznany błąd"}"
+                            UiText.StringResource(
+                                R.string.main_msg_fetch_error,
+                                error.message ?: UiText.StringResource(R.string.common_unknown_error)
+                            )
                         )
                     )
                 }
@@ -98,12 +103,15 @@ class MainViewModel(
             runCatching {
                 addEventUseCase(eventToSave)
             }.onSuccess {
-                emitEffect(MainUiEffect.ShowMessage("Dodano wydarzenie"))
+                emitEffect(MainUiEffect.ShowMessage(UiText.StringResource(R.string.main_msg_event_added)))
                 emitEffect(MainUiEffect.EventSaved)
             }.onFailure { error ->
                 emitEffect(
                     MainUiEffect.ShowMessage(
-                        "Błąd dodawania wydarzenia: ${error.message ?: "nieznany błąd"}"
+                        UiText.StringResource(
+                            R.string.main_msg_add_event_error,
+                            error.message ?: UiText.StringResource(R.string.common_unknown_error)
+                        )
                     )
                 )
             }
@@ -118,7 +126,10 @@ class MainViewModel(
             }.onFailure { error ->
                 emitEffect(
                     MainUiEffect.ShowMessage(
-                        "Błąd wylogowania: ${error.message ?: "spróbuj ponownie"}"
+                        UiText.StringResource(
+                            R.string.main_msg_logout_error,
+                            error.message ?: UiText.StringResource(R.string.common_try_again)
+                        )
                     )
                 )
             }

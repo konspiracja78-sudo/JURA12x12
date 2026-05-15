@@ -42,13 +42,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jura12x12x002.R
 import com.example.jura12x12x002.di.LocalAppContainer
 import com.example.jura12x12x002.di.eventDetailsViewModelFactory
-import com.example.jura12x12x002.model.EVENT_TYPE_ROCKS
+import com.example.jura12x12x002.model.extractRocksDepartureTime
+import com.example.jura12x12x002.model.isRocksType
+import com.example.jura12x12x002.ui.asString
 import com.example.jura12x12x002.ui.components.ChatBubble
 import com.example.jura12x12x002.ui.components.InfoLine
 import com.example.jura12x12x002.ui.components.StatusChip
@@ -78,7 +82,7 @@ fun EventDetailsScreen(
         viewModel.effects.collect { effect ->
             when (effect) {
                 is EventDetailsUiEffect.ShowMessage -> {
-                    Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, effect.message.asString(context), Toast.LENGTH_SHORT).show()
                 }
                 EventDetailsUiEffect.CloseEditDialog -> {
                     showEditDialog = false
@@ -105,7 +109,7 @@ fun EventDetailsScreen(
             ) {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("Ładowanie wydarzenia...")
+                Text(stringResource(R.string.event_details_loading))
             }
         }
         return
@@ -120,7 +124,7 @@ fun EventDetailsScreen(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                Text("Nie udało się wczytać wydarzenia")
+                Text(stringResource(R.string.event_details_load_error))
             }
         }
         return
@@ -129,16 +133,17 @@ fun EventDetailsScreen(
     val cancelled = isCancelled(event)
     val isJoined = uiState.currentUserEmail.isNotBlank() && event.participantEmails.contains(uiState.currentUserEmail)
     val isAuthor = event.authorEmail.isNotBlank() && event.authorEmail == uiState.currentUserEmail
+    val noData = stringResource(R.string.common_no_data)
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Szczegóły wydarzenia") },
+                title = { Text(stringResource(R.string.event_details_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Powrót"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 },
@@ -153,7 +158,7 @@ fun EventDetailsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Edit,
-                                contentDescription = "Edytuj wydarzenie"
+                                contentDescription = stringResource(R.string.event_details_edit_cd)
                             )
                         }
                     }
@@ -178,7 +183,7 @@ fun EventDetailsScreen(
                     OutlinedTextField(
                         value = uiState.newMessage,
                         onValueChange = viewModel::onMessageChange,
-                        label = { Text("Napisz wiadomość") },
+                        label = { Text(stringResource(R.string.event_details_message_label)) },
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -189,7 +194,13 @@ fun EventDetailsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !uiState.isSendingMessage
                     ) {
-                        Text(if (uiState.isSendingMessage) "Wysyłanie..." else "Wyślij")
+                        Text(
+                            if (uiState.isSendingMessage) {
+                                stringResource(R.string.event_details_sending_button)
+                            } else {
+                                stringResource(R.string.event_details_send_button)
+                            }
+                        )
                     }
                 }
             }
@@ -217,10 +228,10 @@ fun EventDetailsScreen(
                             verticalAlignment = Alignment.Top
                         ) {
                             Text(
-                                text = if (event.type == EVENT_TYPE_ROCKS) {
-                                    "Wyjazd w skały"
+                                text = if (event.isRocksType()) {
+                                    stringResource(R.string.event_card_title_rocks)
                                 } else {
-                                    "Trening na panelu"
+                                    stringResource(R.string.event_card_title_panel)
                                 },
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
@@ -231,27 +242,30 @@ fun EventDetailsScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        if (event.type == EVENT_TYPE_ROCKS) {
-                            InfoLine("Typ", "Skały")
-                            InfoLine("Gdzie lecimy", event.title.ifBlank { "-" })
-                            InfoLine("Skąd wyjazd", event.location.ifBlank { "-" })
-                            InfoLine("Data", event.date.ifBlank { "-" })
-                            InfoLine("Godzina", event.timeInfo.ifBlank { "-" })
+                        if (event.isRocksType()) {
+                            InfoLine(stringResource(R.string.common_type), stringResource(R.string.event_type_rocks))
+                            InfoLine(stringResource(R.string.event_label_destination), event.title.ifBlank { noData })
+                            InfoLine(stringResource(R.string.event_label_departure_from), event.location.ifBlank { noData })
+                            InfoLine(stringResource(R.string.common_date), event.date.ifBlank { noData })
+                            InfoLine(
+                                stringResource(R.string.common_time),
+                                extractRocksDepartureTime(event.timeInfo).ifBlank { noData }
+                            )
                         } else {
-                            InfoLine("Typ", "Panel")
-                            InfoLine("Gdzie ładujemy", event.location.ifBlank { "-" })
-                            InfoLine("Miasto", event.city.ifBlank { "-" })
-                            InfoLine("Data", event.date.ifBlank { "-" })
-                            InfoLine("Godziny", event.timeInfo.ifBlank { "-" })
+                            InfoLine(stringResource(R.string.common_type), stringResource(R.string.event_type_panel))
+                            InfoLine(stringResource(R.string.event_label_training_location), event.location.ifBlank { noData })
+                            InfoLine(stringResource(R.string.common_city), event.city.ifBlank { noData })
+                            InfoLine(stringResource(R.string.common_date), event.date.ifBlank { noData })
+                            InfoLine(stringResource(R.string.common_hours), event.timeInfo.ifBlank { noData })
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
                             text = if (event.authorEmail.isNotBlank()) {
-                                "Autor wydarzenia: ${event.authorEmail}"
+                                stringResource(R.string.event_label_event_author, event.authorEmail)
                             } else {
-                                "Autor wydarzenia: brak danych"
+                                stringResource(R.string.event_label_event_author_missing)
                             },
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -259,7 +273,7 @@ fun EventDetailsScreen(
                         if (isAuthor) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "To Ty jesteś autorem tego wydarzenia",
+                                text = stringResource(R.string.event_label_you_are_author),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = JuraWarmBrown
                             )
@@ -268,7 +282,7 @@ fun EventDetailsScreen(
                         if (cancelled && event.statusReason.isNotBlank()) {
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "Powód odwołania: ${event.statusReason}",
+                                text = stringResource(R.string.event_label_cancel_reason, event.statusReason),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -285,8 +299,8 @@ fun EventDetailsScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text("💬 Wiadomości na czacie: ${event.chatCount}")
-                                Text("👥 Liczba uczestników: ${event.participantEmails.size}")
+                                Text(stringResource(R.string.event_chat_count, event.chatCount))
+                                Text(stringResource(R.string.event_participants_count, event.participantEmails.size))
                             }
                         }
                     }
@@ -295,10 +309,10 @@ fun EventDetailsScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 if (event.participantEmails.isEmpty()) {
-                    Text("Lista uczestników: brak zapisanych osób")
+                    Text(stringResource(R.string.event_participants_empty))
                 } else {
                     Text(
-                        text = "Lista uczestników",
+                        text = stringResource(R.string.event_participants_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = JuraWarmBrown
@@ -307,7 +321,7 @@ fun EventDetailsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     event.participantEmails.forEach { email ->
-                        Text("• $email")
+                        Text(stringResource(R.string.event_participant_item, email))
                     }
                 }
 
@@ -320,7 +334,13 @@ fun EventDetailsScreen(
                         onClick = viewModel::toggleParticipation,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (isJoined) "Opuść wydarzenie" else "Dołącz do wydarzenia")
+                        Text(
+                            if (isJoined) {
+                                stringResource(R.string.event_leave_button)
+                            } else {
+                                stringResource(R.string.event_join_button)
+                            }
+                        )
                     }
 
                     if (isAuthor && !cancelled) {
@@ -334,7 +354,7 @@ fun EventDetailsScreen(
                             },
                             modifier = Modifier.wrapContentWidth()
                         ) {
-                            Text("Edytuj")
+                            Text(stringResource(R.string.common_edit))
                         }
                     }
                 }
@@ -355,9 +375,13 @@ fun EventDetailsScreen(
                     ) {
                         Text(
                             if (uiState.isUpdatingStatus) {
-                                "Zapisywanie..."
+                                stringResource(R.string.common_saving)
                             } else {
-                                if (cancelled) "Przywróć wydarzenie" else "Odwołaj wydarzenie"
+                                if (cancelled) {
+                                    stringResource(R.string.event_restore_button)
+                                } else {
+                                    stringResource(R.string.event_cancel_button)
+                                }
                             }
                         )
                     }
@@ -366,7 +390,7 @@ fun EventDetailsScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "Czat wydarzenia",
+                    text = stringResource(R.string.event_chat_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = JuraWarmBrown
@@ -377,7 +401,7 @@ fun EventDetailsScreen(
 
             if (uiState.messages.isEmpty()) {
                 item {
-                    Text("Brak wiadomości")
+                    Text(stringResource(R.string.event_no_messages))
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             } else {
@@ -400,9 +424,13 @@ fun EventDetailsScreen(
 
     if (showEditDialog) {
         EventFormDialog(
-            dialogTitle = "Edytuj wydarzenie",
+            dialogTitle = stringResource(R.string.event_edit_title),
             initialEvent = event,
-            confirmButtonText = if (uiState.isEditingEvent) "Zapisywanie..." else "Zapisz",
+            confirmButtonText = if (uiState.isEditingEvent) {
+                stringResource(R.string.common_saving)
+            } else {
+                stringResource(R.string.common_save)
+            },
             isSaving = uiState.isEditingEvent,
             onDismiss = {
                 if (!uiState.isEditingEvent) {
@@ -435,12 +463,12 @@ private fun EventDetailsStateScaffold(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Szczegóły wydarzenia") },
+                title = { Text(stringResource(R.string.event_details_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Powrót"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 }

@@ -23,11 +23,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.jura12x12x002.R
 import com.example.jura12x12x002.model.ChatMessage
-import com.example.jura12x12x002.model.EVENT_TYPE_ROCKS
 import com.example.jura12x12x002.model.Event
+import com.example.jura12x12x002.model.extractRocksDepartureTime
+import com.example.jura12x12x002.model.isRocksType
 import com.example.jura12x12x002.ui.theme.JuraCardBackground
 import com.example.jura12x12x002.ui.theme.JuraDanger
 import com.example.jura12x12x002.ui.theme.JuraGreen
@@ -66,7 +69,11 @@ fun SectionHeader(title: String) {
 fun StatusChip(event: Event) {
     val cancelled = isCancelled(event)
     val containerColor = if (cancelled) JuraDanger else JuraGreen
-    val label = if (cancelled) "ODWOŁANE" else "AKTYWNE"
+    val label = if (cancelled) {
+        stringResource(R.string.event_status_chip_cancelled)
+    } else {
+        stringResource(R.string.event_status_chip_active)
+    }
 
     FilterChip(
         selected = true,
@@ -107,6 +114,7 @@ fun EventCard(
     onClick: () -> Unit
 ) {
     val isAuthor = event.authorEmail.isNotBlank() && event.authorEmail == currentUserEmail
+    val noData = stringResource(R.string.common_no_data)
 
     Card(
         modifier = Modifier
@@ -128,10 +136,10 @@ fun EventCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = if (event.type == EVENT_TYPE_ROCKS) {
-                            "Wyjazd w skały"
+                        text = if (event.isRocksType()) {
+                            stringResource(R.string.event_card_title_rocks)
                         } else {
-                            "Trening na panelu"
+                            stringResource(R.string.event_card_title_panel)
                         },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
@@ -145,25 +153,28 @@ fun EventCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (event.type == EVENT_TYPE_ROCKS) {
-                InfoLine("Cel", event.title.ifBlank { "-" })
-                InfoLine("Start / skąd", event.location.ifBlank { "-" })
-                InfoLine("Data", event.date.ifBlank { "-" })
-                InfoLine("Godzina", event.timeInfo.ifBlank { "-" })
+            if (event.isRocksType()) {
+                InfoLine(stringResource(R.string.event_label_target), event.title.ifBlank { noData })
+                InfoLine(stringResource(R.string.event_label_start_from), event.location.ifBlank { noData })
+                InfoLine(stringResource(R.string.common_date), event.date.ifBlank { noData })
+                InfoLine(
+                    stringResource(R.string.common_time),
+                    extractRocksDepartureTime(event.timeInfo).ifBlank { noData }
+                )
             } else {
-                InfoLine("Miejsce", event.location.ifBlank { "-" })
-                InfoLine("Miasto", event.city.ifBlank { "-" })
-                InfoLine("Data", event.date.ifBlank { "-" })
-                InfoLine("Godziny", event.timeInfo.ifBlank { "-" })
+                InfoLine(stringResource(R.string.event_label_place), event.location.ifBlank { noData })
+                InfoLine(stringResource(R.string.common_city), event.city.ifBlank { noData })
+                InfoLine(stringResource(R.string.common_date), event.date.ifBlank { noData })
+                InfoLine(stringResource(R.string.common_hours), event.timeInfo.ifBlank { noData })
             }
 
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = if (event.authorEmail.isNotBlank()) {
-                    "Autor: ${event.authorEmail}"
+                    stringResource(R.string.event_label_author, event.authorEmail)
                 } else {
-                    "Autor: brak danych"
+                    stringResource(R.string.event_label_author_missing)
                 },
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -171,7 +182,7 @@ fun EventCard(
             if (isAuthor) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "To Twoje wydarzenie",
+                    text = stringResource(R.string.event_label_is_your_event),
                     style = MaterialTheme.typography.labelLarge,
                     color = JuraWarmBrown
                 )
@@ -180,7 +191,7 @@ fun EventCard(
             if (isCancelled(event) && event.statusReason.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Powód: ${event.statusReason}",
+                    text = stringResource(R.string.event_label_reason, event.statusReason),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -197,7 +208,11 @@ fun EventCard(
                     .padding(12.dp)
             ) {
                 Text(
-                    text = "💬 Czat: ${event.chatCount}   |   👥 Uczestnicy: ${event.participantEmails.size}",
+                    text = stringResource(
+                        R.string.event_stats_card,
+                        event.chatCount,
+                        event.participantEmails.size
+                    ),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -205,7 +220,7 @@ fun EventCard(
             if (event.chatCount > 0L || event.participantEmails.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "To wydarzenie już kogoś interesuje",
+                    text = stringResource(R.string.event_interest_hint),
                     style = MaterialTheme.typography.labelMedium,
                     color = JuraWarmBrown
                 )
@@ -245,7 +260,11 @@ fun ChatBubble(
                 modifier = Modifier.padding(12.dp)
             ) {
                 Text(
-                    text = if (message.authorEmail.isBlank()) "Anonim" else message.authorEmail,
+                    text = if (message.authorEmail.isBlank()) {
+                        stringResource(R.string.common_anonymous)
+                    } else {
+                        message.authorEmail
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     color = JuraWarmBrown,
                     fontWeight = FontWeight.SemiBold

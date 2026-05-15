@@ -38,16 +38,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jura12x12x002.R
 import com.example.jura12x12x002.di.LocalAppContainer
 import com.example.jura12x12x002.di.mainViewModelFactory
-import com.example.jura12x12x002.model.EVENT_STATUS_ACTIVE
-import com.example.jura12x12x002.model.EVENT_STATUS_CANCELLED
-import com.example.jura12x12x002.model.EVENT_TYPE_PANEL
-import com.example.jura12x12x002.model.EVENT_TYPE_ROCKS
+import com.example.jura12x12x002.model.isPanelType
+import com.example.jura12x12x002.model.isRocksType
+import com.example.jura12x12x002.ui.asString
 import com.example.jura12x12x002.ui.components.EventCard
 import com.example.jura12x12x002.ui.components.SectionHeader
 import com.example.jura12x12x002.ui.theme.JuraLight
@@ -68,13 +69,17 @@ fun MainScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }
-    val filterOptions = listOf("Wszystkie", EVENT_STATUS_ACTIVE, EVENT_STATUS_CANCELLED)
+    val filterOptions = listOf(
+        stringResource(R.string.event_filter_all),
+        stringResource(R.string.event_status_active),
+        stringResource(R.string.event_status_cancelled)
+    )
 
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 is MainUiEffect.ShowMessage -> {
-                    Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, effect.message.asString(context), Toast.LENGTH_SHORT).show()
                 }
                 MainUiEffect.EventSaved -> {
                     showAddDialog = false
@@ -83,9 +88,9 @@ fun MainScreen(
         }
     }
 
-    val filteredByStatus = when (filterOptions[uiState.selectedFilterIndex]) {
-        EVENT_STATUS_ACTIVE -> uiState.allEvents.filter { !isCancelled(it) }
-        EVENT_STATUS_CANCELLED -> uiState.allEvents.filter(::isCancelled)
+    val filteredByStatus = when (uiState.selectedFilterIndex) {
+        1 -> uiState.allEvents.filter { !isCancelled(it) }
+        2 -> uiState.allEvents.filter(::isCancelled)
         else -> uiState.allEvents
     }
 
@@ -100,19 +105,19 @@ fun MainScreen(
         }
     }
 
-    val skalyEvents = filteredEvents.filter { it.type == EVENT_TYPE_ROCKS }
-    val panelEvents = filteredEvents.filter { it.type == EVENT_TYPE_PANEL }
+    val rocksEvents = filteredEvents.filter { it.isRocksType() }
+    val panelEvents = filteredEvents.filter { it.isPanelType() }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("JURA12x12") },
+                title = { Text(stringResource(R.string.app_name)) },
                 actions = {
                     Button(
                         onClick = viewModel::logout,
                         modifier = Modifier.padding(end = 8.dp)
                     ) {
-                        Text("Wyloguj")
+                        Text(stringResource(R.string.event_logout))
                     }
                 }
             )
@@ -137,7 +142,7 @@ fun MainScreen(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Filtr wydarzeń",
+                text = stringResource(R.string.event_filter_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = JuraWarmBrown
@@ -174,11 +179,11 @@ fun MainScreen(
                 OutlinedTextField(
                     value = uiState.searchQuery,
                     onValueChange = viewModel::onSearchQueryChange,
-                    label = { Text("Szukaj: cel / miejsce / miasto") },
+                    label = { Text(stringResource(R.string.event_search_label)) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Search,
-                            contentDescription = "Szukaj"
+                            contentDescription = stringResource(R.string.common_search)
                         )
                     },
                     singleLine = true,
@@ -200,29 +205,29 @@ fun MainScreen(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("Ładowanie wydarzeń...")
+                Text(stringResource(R.string.event_loading_list))
             } else if (uiState.allEvents.isEmpty()) {
-                Text("Brak wydarzeń w bazie")
+                Text(stringResource(R.string.event_empty_database))
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Dodaj pierwsze wydarzenie przyciskiem +")
+                Text(stringResource(R.string.event_empty_database_cta))
             } else if (filteredEvents.isEmpty()) {
-                Text("Brak wydarzeń dla wybranego filtra lub wyszukiwania")
+                Text(stringResource(R.string.event_empty_filtered))
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     item {
-                        SectionHeader(title = "🧗 Skały")
+                        SectionHeader(title = stringResource(R.string.event_section_rocks))
                     }
 
-                    if (skalyEvents.isEmpty()) {
+                    if (rocksEvents.isEmpty()) {
                         item {
-                            Text("Brak wydarzeń w sekcji Skały")
+                            Text(stringResource(R.string.event_empty_rocks))
                             Spacer(modifier = Modifier.height(20.dp))
                         }
                     } else {
                         items(
-                            items = skalyEvents,
+                            items = rocksEvents,
                             key = { it.id }
                         ) { event ->
                             EventCard(
@@ -235,12 +240,12 @@ fun MainScreen(
 
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
-                        SectionHeader(title = "🟠 Panel")
+                        SectionHeader(title = stringResource(R.string.event_section_panel))
                     }
 
                     if (panelEvents.isEmpty()) {
                         item {
-                            Text("Brak wydarzeń w sekcji Panel")
+                            Text(stringResource(R.string.event_empty_panel))
                         }
                     } else {
                         items(
@@ -261,9 +266,13 @@ fun MainScreen(
 
     if (showAddDialog) {
         EventFormDialog(
-            dialogTitle = "Nowe wydarzenie",
+            dialogTitle = stringResource(R.string.event_new_title),
             initialEvent = null,
-            confirmButtonText = if (uiState.isAddingEvent) "Dodawanie..." else "Dodaj",
+            confirmButtonText = if (uiState.isAddingEvent) {
+                stringResource(R.string.event_adding_button)
+            } else {
+                stringResource(R.string.event_add_button)
+            },
             isSaving = uiState.isAddingEvent,
             onDismiss = {
                 if (!uiState.isAddingEvent) {

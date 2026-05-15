@@ -2,6 +2,7 @@ package com.example.jura12x12x002.ui.events
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.jura12x12x002.R
 import com.example.jura12x12x002.domain.usecase.auth.ObserveAuthStateUseCase
 import com.example.jura12x12x002.domain.usecase.event.CancelEventUseCase
 import com.example.jura12x12x002.domain.usecase.event.ObserveEventMessagesUseCase
@@ -12,6 +13,7 @@ import com.example.jura12x12x002.domain.usecase.event.ToggleEventParticipationUs
 import com.example.jura12x12x002.domain.usecase.event.UpdateEventUseCase
 import com.example.jura12x12x002.model.ChatMessage
 import com.example.jura12x12x002.model.Event
+import com.example.jura12x12x002.ui.UiText
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -34,7 +36,7 @@ data class EventDetailsUiState(
 )
 
 sealed interface EventDetailsUiEffect {
-    data class ShowMessage(val message: String) : EventDetailsUiEffect
+    data class ShowMessage(val message: UiText) : EventDetailsUiEffect
     data object CloseEditDialog : EventDetailsUiEffect
     data object CloseCancelDialog : EventDetailsUiEffect
 }
@@ -71,7 +73,10 @@ class EventDetailsViewModel(
                     _uiState.update { state -> state.copy(isEventLoading = false) }
                     emitEffect(
                         EventDetailsUiEffect.ShowMessage(
-                            "Błąd wydarzenia: ${error.message ?: "nieznany błąd"}"
+                            UiText.StringResource(
+                                R.string.details_msg_event_error,
+                                error.message ?: UiText.StringResource(R.string.common_unknown_error)
+                            )
                         )
                     )
                 }
@@ -90,7 +95,10 @@ class EventDetailsViewModel(
                 .catch { error ->
                     emitEffect(
                         EventDetailsUiEffect.ShowMessage(
-                            "Błąd czatu: ${error.message ?: "nieznany błąd"}"
+                            UiText.StringResource(
+                                R.string.details_msg_chat_error,
+                                error.message ?: UiText.StringResource(R.string.common_unknown_error)
+                            )
                         )
                     )
                 }
@@ -109,19 +117,24 @@ class EventDetailsViewModel(
         val event = state.currentEvent
 
         if (event == null) {
-            emitMessage("Nie udało się wczytać wydarzenia")
+            emitMessage(UiText.StringResource(R.string.event_details_load_error))
             return
         }
 
         if (state.isSendingMessage) return
 
         if (event.id.isBlank()) {
-            emitMessage("Brak ID wydarzenia")
+            emitMessage(UiText.StringResource(R.string.details_msg_missing_event_id))
+            return
+        }
+
+        if (state.currentUserEmail.isBlank()) {
+            emitMessage(UiText.StringResource(R.string.details_msg_missing_email))
             return
         }
 
         if (state.newMessage.isBlank()) {
-            emitMessage("Wpisz wiadomość")
+            emitMessage(UiText.StringResource(R.string.details_msg_enter_message))
             return
         }
 
@@ -132,7 +145,7 @@ class EventDetailsViewModel(
                     event.id,
                     ChatMessage(
                         text = state.newMessage.trim(),
-                        authorEmail = state.currentUserEmail.ifBlank { "Brak emaila" },
+                        authorEmail = state.currentUserEmail,
                         createdAt = System.currentTimeMillis()
                     )
                 )
@@ -147,7 +160,10 @@ class EventDetailsViewModel(
                 _uiState.update { current -> current.copy(isSendingMessage = false) }
                 emitEffect(
                     EventDetailsUiEffect.ShowMessage(
-                        "Błąd wysyłki: ${error.message ?: "nieznany błąd"}"
+                        UiText.StringResource(
+                            R.string.details_msg_send_error,
+                            error.message ?: UiText.StringResource(R.string.common_unknown_error)
+                        )
                     )
                 )
             }
@@ -159,12 +175,12 @@ class EventDetailsViewModel(
         val event = state.currentEvent
 
         if (event == null) {
-            emitMessage("Nie udało się wczytać wydarzenia")
+            emitMessage(UiText.StringResource(R.string.event_details_load_error))
             return
         }
 
         if (state.currentUserEmail.isBlank()) {
-            emitMessage("Brak zalogowanego emaila")
+            emitMessage(UiText.StringResource(R.string.details_msg_missing_email))
             return
         }
 
@@ -180,17 +196,22 @@ class EventDetailsViewModel(
             }.onSuccess {
                 emitEffect(
                     EventDetailsUiEffect.ShowMessage(
-                        if (isJoined) {
-                            "Opuściłeś wydarzenie"
-                        } else {
-                            "Dołączyłeś do wydarzenia"
-                        }
+                        UiText.StringResource(
+                            if (isJoined) {
+                                R.string.details_msg_left_event
+                            } else {
+                                R.string.details_msg_joined_event
+                            }
+                        )
                     )
                 )
             }.onFailure { error ->
                 emitEffect(
                     EventDetailsUiEffect.ShowMessage(
-                        "Błąd zapisu uczestnika: ${error.message ?: "nieznany błąd"}"
+                        UiText.StringResource(
+                            R.string.details_msg_participation_error,
+                            error.message ?: UiText.StringResource(R.string.common_unknown_error)
+                        )
                     )
                 )
             }
@@ -207,11 +228,18 @@ class EventDetailsViewModel(
                 updateEventUseCase(updatedEvent)
             }.onSuccess {
                 emitEffect(EventDetailsUiEffect.CloseEditDialog)
-                emitEffect(EventDetailsUiEffect.ShowMessage("Zapisano zmiany"))
+                emitEffect(
+                    EventDetailsUiEffect.ShowMessage(
+                        UiText.StringResource(R.string.details_msg_changes_saved)
+                    )
+                )
             }.onFailure { error ->
                 emitEffect(
                     EventDetailsUiEffect.ShowMessage(
-                        "Błąd edycji: ${error.message ?: "nieznany błąd"}"
+                        UiText.StringResource(
+                            R.string.details_msg_edit_error,
+                            error.message ?: UiText.StringResource(R.string.common_unknown_error)
+                        )
                     )
                 )
             }
@@ -224,7 +252,7 @@ class EventDetailsViewModel(
         val event = state.currentEvent
 
         if (event == null) {
-            emitMessage("Nie udało się wczytać wydarzenia")
+            emitMessage(UiText.StringResource(R.string.event_details_load_error))
             return
         }
 
@@ -236,11 +264,18 @@ class EventDetailsViewModel(
                 cancelEventUseCase(event.id, reason.trim())
             }.onSuccess {
                 emitEffect(EventDetailsUiEffect.CloseCancelDialog)
-                emitEffect(EventDetailsUiEffect.ShowMessage("Wydarzenie zostało odwołane"))
+                emitEffect(
+                    EventDetailsUiEffect.ShowMessage(
+                        UiText.StringResource(R.string.details_msg_event_cancelled)
+                    )
+                )
             }.onFailure { error ->
                 emitEffect(
                     EventDetailsUiEffect.ShowMessage(
-                        "Błąd odwołania: ${error.message ?: "nieznany błąd"}"
+                        UiText.StringResource(
+                            R.string.details_msg_cancel_error,
+                            error.message ?: UiText.StringResource(R.string.common_unknown_error)
+                        )
                     )
                 )
             }
@@ -253,7 +288,7 @@ class EventDetailsViewModel(
         val event = state.currentEvent
 
         if (event == null) {
-            emitMessage("Nie udało się wczytać wydarzenia")
+            emitMessage(UiText.StringResource(R.string.event_details_load_error))
             return
         }
 
@@ -264,11 +299,18 @@ class EventDetailsViewModel(
             runCatching {
                 restoreEventUseCase(event.id)
             }.onSuccess {
-                emitEffect(EventDetailsUiEffect.ShowMessage("Przywrócono wydarzenie"))
+                emitEffect(
+                    EventDetailsUiEffect.ShowMessage(
+                        UiText.StringResource(R.string.details_msg_event_restored)
+                    )
+                )
             }.onFailure { error ->
                 emitEffect(
                     EventDetailsUiEffect.ShowMessage(
-                        "Błąd przywracania: ${error.message ?: "nieznany błąd"}"
+                        UiText.StringResource(
+                            R.string.details_msg_restore_error,
+                            error.message ?: UiText.StringResource(R.string.common_unknown_error)
+                        )
                     )
                 )
             }
@@ -276,7 +318,7 @@ class EventDetailsViewModel(
         }
     }
 
-    private fun emitMessage(message: String) {
+    private fun emitMessage(message: UiText) {
         viewModelScope.launch {
             emitEffect(EventDetailsUiEffect.ShowMessage(message))
         }

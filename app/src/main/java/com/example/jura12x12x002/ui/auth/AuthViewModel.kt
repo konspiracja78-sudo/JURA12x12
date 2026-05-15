@@ -2,9 +2,11 @@ package com.example.jura12x12x002.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.jura12x12x002.R
 import com.example.jura12x12x002.domain.usecase.auth.LoginUseCase
 import com.example.jura12x12x002.domain.usecase.auth.RegisterUseCase
 import com.example.jura12x12x002.domain.usecase.auth.ResetPasswordUseCase
+import com.example.jura12x12x002.ui.UiText
 import com.example.jura12x12x002.utils.sanitizeEmail
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,8 +36,8 @@ class AuthViewModel(
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val _messages = MutableSharedFlow<String>()
-    val messages: SharedFlow<String> = _messages.asSharedFlow()
+    private val _messages = MutableSharedFlow<UiText>()
+    val messages: SharedFlow<UiText> = _messages.asSharedFlow()
 
     fun showRegister() {
         _uiState.update { it.copy(isRegisterMode = true) }
@@ -70,7 +72,7 @@ class AuthViewModel(
         val password = uiState.value.loginPassword
 
         if (email.isBlank() || password.isBlank()) {
-            sendMessage("Uzupełnij email i hasło")
+            sendMessage(UiText.StringResource(R.string.auth_msg_fill_email_password))
             return
         }
 
@@ -79,9 +81,14 @@ class AuthViewModel(
             runCatching {
                 loginUseCase(email, password)
             }.onSuccess {
-                sendMessage("Zalogowano")
+                sendMessage(UiText.StringResource(R.string.auth_msg_logged_in))
             }.onFailure { error ->
-                sendMessage("Błąd logowania: ${error.message ?: "spróbuj ponownie"}")
+                sendMessage(
+                    UiText.StringResource(
+                        R.string.auth_msg_login_error,
+                        error.message ?: UiText.StringResource(R.string.common_try_again)
+                    )
+                )
             }
             _uiState.update { it.copy(isLoading = false) }
         }
@@ -93,17 +100,17 @@ class AuthViewModel(
         val repeatPassword = uiState.value.registerRepeatPassword
 
         if (email.isBlank() || password.isBlank() || repeatPassword.isBlank()) {
-            sendMessage("Uzupełnij wszystkie pola")
+            sendMessage(UiText.StringResource(R.string.auth_msg_fill_all_fields))
             return
         }
 
         if (password != repeatPassword) {
-            sendMessage("Hasła nie są takie same")
+            sendMessage(UiText.StringResource(R.string.auth_msg_passwords_not_match))
             return
         }
 
         if (password.length < 6) {
-            sendMessage("Hasło musi mieć co najmniej 6 znaków")
+            sendMessage(UiText.StringResource(R.string.auth_msg_password_too_short))
             return
         }
 
@@ -112,9 +119,14 @@ class AuthViewModel(
             runCatching {
                 registerUseCase(email, password)
             }.onSuccess {
-                sendMessage("Konto utworzone")
+                sendMessage(UiText.StringResource(R.string.auth_msg_account_created))
             }.onFailure { error ->
-                sendMessage("Błąd rejestracji: ${error.message ?: "spróbuj ponownie"}")
+                sendMessage(
+                    UiText.StringResource(
+                        R.string.auth_msg_register_error,
+                        error.message ?: UiText.StringResource(R.string.common_try_again)
+                    )
+                )
             }
             _uiState.update { it.copy(isLoading = false) }
         }
@@ -124,7 +136,7 @@ class AuthViewModel(
         val email = sanitizeEmail(uiState.value.loginEmail)
 
         if (email.isBlank()) {
-            sendMessage("Najpierw wpisz email")
+            sendMessage(UiText.StringResource(R.string.auth_msg_enter_email_first))
             return
         }
 
@@ -133,15 +145,20 @@ class AuthViewModel(
             runCatching {
                 resetPasswordUseCase(email)
             }.onSuccess {
-                sendMessage("Wysłano mail do resetu hasła")
+                sendMessage(UiText.StringResource(R.string.auth_msg_password_reset_sent))
             }.onFailure { error ->
-                sendMessage("Błąd resetu hasła: ${error.message ?: "spróbuj ponownie"}")
+                sendMessage(
+                    UiText.StringResource(
+                        R.string.auth_msg_password_reset_error,
+                        error.message ?: UiText.StringResource(R.string.common_try_again)
+                    )
+                )
             }
             _uiState.update { it.copy(isLoading = false) }
         }
     }
 
-    private fun sendMessage(message: String) {
+    private fun sendMessage(message: UiText) {
         viewModelScope.launch {
             _messages.emit(message)
         }

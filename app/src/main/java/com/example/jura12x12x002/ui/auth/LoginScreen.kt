@@ -14,8 +14,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.jura12x12x002.R
 
 @Composable
 fun LoginScreen(
@@ -34,7 +36,7 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Logowanie",
+            text = stringResource(R.string.auth_login_title),
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.align(Alignment.Start)
         )
@@ -42,7 +44,7 @@ fun LoginScreen(
         OutlinedTextField(
             value = state.loginEmail,
             onValueChange = onEmailChange,
-            label = { Text("Email") },
+            label = { Text(stringResource(R.string.common_email)) },
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
         )
@@ -50,7 +52,7 @@ fun LoginScreen(
         OutlinedTextField(
             value = state.loginPassword,
             onValueChange = onPasswordChange,
-            label = { Text("Hasło") },
+            label = { Text(stringResource(R.string.common_password)) },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
@@ -65,7 +67,7 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
         ) {
-            Text("Zaloguj")
+            Text(stringResource(R.string.auth_login_button))
         }
 
         Button(
@@ -73,7 +75,7 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
         ) {
-            Text("Resetuj hasło")
+            Text(stringResource(R.string.auth_reset_password_button))
         }
 
         TextButton(
@@ -81,7 +83,7 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
         ) {
-            Text("Nie masz konta? Przejdź do rejestracji")
+            Text(stringResource(R.string.auth_go_to_register))
         }
     }
 }

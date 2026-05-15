@@ -14,8 +14,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.jura12x12x002.R
 
 @Composable
 fun RegisterScreen(
@@ -34,7 +36,7 @@ fun RegisterScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Rejestracja",
+            text = stringResource(R.string.auth_register_title),
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.align(Alignment.Start)
         )
@@ -42,7 +44,7 @@ fun RegisterScreen(
         OutlinedTextField(
             value = state.registerEmail,
             onValueChange = onEmailChange,
-            label = { Text("Email") },
+            label = { Text(stringResource(R.string.common_email)) },
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
         )
@@ -50,7 +52,7 @@ fun RegisterScreen(
         OutlinedTextField(
             value = state.registerPassword,
             onValueChange = onPasswordChange,
-            label = { Text("Hasło") },
+            label = { Text(stringResource(R.string.common_password)) },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
@@ -59,7 +61,7 @@ fun RegisterScreen(
         OutlinedTextField(
             value = state.registerRepeatPassword,
             onValueChange = onRepeatPasswordChange,
-            label = { Text("Powtórz hasło") },
+            label = { Text(stringResource(R.string.common_repeat_password)) },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
@@ -74,7 +76,7 @@ fun RegisterScreen(
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
         ) {
-            Text("Zarejestruj się")
+            Text(stringResource(R.string.auth_register_button))
         }
 
         TextButton(
@@ -82,7 +84,7 @@ fun RegisterScreen(
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
         ) {
-            Text("Masz już konto? Wróć do logowania")
+            Text(stringResource(R.string.auth_go_to_login))
         }
     }
 }

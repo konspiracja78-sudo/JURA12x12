@@ -23,12 +23,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.jura12x12x002.R
 import com.example.jura12x12x002.model.EVENT_STATUS_ACTIVE
 import com.example.jura12x12x002.model.EVENT_TYPE_PANEL
 import com.example.jura12x12x002.model.EVENT_TYPE_ROCKS
 import com.example.jura12x12x002.model.Event
 import com.example.jura12x12x002.model.ROCKS_TIME_PREFIX
+import com.example.jura12x12x002.model.extractRocksDepartureTime
+import com.example.jura12x12x002.model.isPanelType
+import com.example.jura12x12x002.model.isRocksType
 import java.util.Calendar
 
 @Composable
@@ -45,10 +50,10 @@ fun CancelEventDialog(
                 onDismiss()
             }
         },
-        title = { Text("Odwołaj wydarzenie") },
+        title = { Text(stringResource(R.string.dialog_cancel_event_title)) },
         text = {
             Column {
-                Text("Możesz wpisać krótki powód odwołania.")
+                Text(stringResource(R.string.dialog_cancel_event_description))
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = reason,
@@ -57,7 +62,7 @@ fun CancelEventDialog(
                             reason = it
                         }
                     },
-                    label = { Text("Powód odwołania") },
+                    label = { Text(stringResource(R.string.dialog_cancel_event_reason_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -70,7 +75,13 @@ fun CancelEventDialog(
                     }
                 }
             ) {
-                Text(if (isSaving) "Zapisywanie..." else "Odwołaj")
+                Text(
+                    if (isSaving) {
+                        stringResource(R.string.common_saving)
+                    } else {
+                        stringResource(R.string.dialog_cancel_event_confirm)
+                    }
+                )
             }
         },
         dismissButton = {
@@ -81,7 +92,7 @@ fun CancelEventDialog(
                     }
                 }
             ) {
-                Text("Anuluj")
+                Text(stringResource(R.string.common_cancel))
             }
         }
     )
@@ -100,7 +111,7 @@ fun EventFormDialog(
     val context = LocalContext.current
     val calendar = Calendar.getInstance()
 
-    val initialTypeIndex = if (initialEvent?.type == EVENT_TYPE_PANEL) 1 else 0
+    val initialTypeIndex = if (initialEvent?.isPanelType() == true) 1 else 0
 
     var title by remember { mutableStateOf(initialEvent?.title ?: "") }
     var location by remember { mutableStateOf(initialEvent?.location ?: "") }
@@ -112,8 +123,8 @@ fun EventFormDialog(
 
     var departureTime by remember {
         mutableStateOf(
-            if (initialEvent?.type == EVENT_TYPE_ROCKS) {
-                initialEvent.timeInfo.removePrefix(ROCKS_TIME_PREFIX).trim()
+            if (initialEvent?.isRocksType() == true) {
+                extractRocksDepartureTime(initialEvent.timeInfo)
             } else {
                 ""
             }
@@ -122,7 +133,7 @@ fun EventFormDialog(
 
     var startTime by remember {
         mutableStateOf(
-            if (initialEvent?.type == EVENT_TYPE_PANEL) {
+            if (initialEvent?.isPanelType() == true) {
                 initialEvent.timeInfo.split(" - ").firstOrNull()?.trim() ?: ""
             } else {
                 ""
@@ -132,7 +143,7 @@ fun EventFormDialog(
 
     var endTime by remember {
         mutableStateOf(
-            if (initialEvent?.type == EVENT_TYPE_PANEL) {
+            if (initialEvent?.isPanelType() == true) {
                 initialEvent.timeInfo.split(" - ").getOrNull(1)?.trim() ?: ""
             } else {
                 ""
@@ -182,7 +193,7 @@ fun EventFormDialog(
         text = {
             Column {
                 Text(
-                    text = "Typ wydarzenia",
+                    text = stringResource(R.string.event_form_type_title),
                     style = MaterialTheme.typography.titleMedium
                 )
 
@@ -191,7 +202,7 @@ fun EventFormDialog(
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    types.forEachIndexed { index, label ->
+                    types.forEachIndexed { index, type ->
                         SegmentedButton(
                             shape = SegmentedButtonDefaults.itemShape(
                                 index = index,
@@ -210,7 +221,13 @@ fun EventFormDialog(
                             },
                             selected = index == selectedTypeIndex
                         ) {
-                            Text(label)
+                            Text(
+                                if (type == EVENT_TYPE_ROCKS) {
+                                    stringResource(R.string.event_type_rocks)
+                                } else {
+                                    stringResource(R.string.event_type_panel)
+                                }
+                            )
                         }
                     }
                 }
@@ -223,7 +240,7 @@ fun EventFormDialog(
                         onValueChange = {
                             if (!isSaving) title = it
                         },
-                        label = { Text("Gdzie lecimy") },
+                        label = { Text(stringResource(R.string.event_label_destination)) },
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -234,7 +251,7 @@ fun EventFormDialog(
                         onValueChange = {
                             if (!isSaving) location = it
                         },
-                        label = { Text("Skąd wyjazd") },
+                        label = { Text(stringResource(R.string.event_label_departure_from)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
@@ -243,7 +260,7 @@ fun EventFormDialog(
                         onValueChange = {
                             if (!isSaving) location = it
                         },
-                        label = { Text("Gdzie ładujemy") },
+                        label = { Text(stringResource(R.string.event_label_training_location)) },
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -254,7 +271,7 @@ fun EventFormDialog(
                         onValueChange = {
                             if (!isSaving) city = it
                         },
-                        label = { Text("Jakie miasto") },
+                        label = { Text(stringResource(R.string.event_label_which_city)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -264,7 +281,7 @@ fun EventFormDialog(
                 OutlinedTextField(
                     value = date,
                     onValueChange = {},
-                    label = { Text("Data") },
+                    label = { Text(stringResource(R.string.common_date)) },
                     readOnly = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -275,13 +292,13 @@ fun EventFormDialog(
                     onClick = { openDatePicker() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Wybierz datę")
+                    Text(stringResource(R.string.event_form_pick_date))
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 if (types[selectedTypeIndex] == EVENT_TYPE_ROCKS) {
-                    Text("Godzina wyjazdu")
+                    Text(stringResource(R.string.event_form_departure_time_title))
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Button(
@@ -290,14 +307,14 @@ fun EventFormDialog(
                     ) {
                         Text(
                             if (departureTime.isEmpty()) {
-                                "Wybierz godzinę wyjazdu"
+                                stringResource(R.string.event_form_pick_departure_time)
                             } else {
                                 departureTime
                             }
                         )
                     }
                 } else {
-                    Text("Godziny treningu")
+                    Text(stringResource(R.string.event_form_training_hours_title))
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Button(
@@ -306,7 +323,7 @@ fun EventFormDialog(
                     ) {
                         Text(
                             if (startTime.isEmpty()) {
-                                "Wybierz godzinę startu"
+                                stringResource(R.string.event_form_pick_start_time)
                             } else {
                                 startTime
                             }
@@ -321,7 +338,7 @@ fun EventFormDialog(
                     ) {
                         Text(
                             if (endTime.isEmpty()) {
-                                "Wybierz godzinę końca"
+                                stringResource(R.string.event_form_pick_end_time)
                             } else {
                                 endTime
                             }
@@ -338,7 +355,11 @@ fun EventFormDialog(
                     val selectedType = types[selectedTypeIndex]
 
                     if (date.isBlank()) {
-                        Toast.makeText(context, "Wybierz datę", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.event_form_error_pick_date),
+                            Toast.LENGTH_SHORT
+                        ).show()
                         return@Button
                     }
 
@@ -346,7 +367,7 @@ fun EventFormDialog(
                         if (title.isBlank() || location.isBlank() || departureTime.isBlank()) {
                             Toast.makeText(
                                 context,
-                                "Uzupełnij gdzie lecimy, skąd wyjazd i godzinę wyjazdu",
+                                context.getString(R.string.event_form_error_fill_rocks),
                                 Toast.LENGTH_SHORT
                             ).show()
                             return@Button
@@ -359,7 +380,7 @@ fun EventFormDialog(
                                 location = location.trim(),
                                 date = date,
                                 type = selectedType,
-                                timeInfo = "$ROCKS_TIME_PREFIX$departureTime",
+                                timeInfo = "$ROCKS_TIME_PREFIX${departureTime.trim()}",
                                 city = "",
                                 participantEmails = initialEvent?.participantEmails ?: emptyList(),
                                 chatCount = initialEvent?.chatCount ?: 0L,
@@ -372,7 +393,7 @@ fun EventFormDialog(
                         if (location.isBlank() || city.isBlank() || startTime.isBlank() || endTime.isBlank()) {
                             Toast.makeText(
                                 context,
-                                "Uzupełnij gdzie ładujemy, miasto i godziny treningu",
+                                context.getString(R.string.event_form_error_fill_panel),
                                 Toast.LENGTH_SHORT
                             ).show()
                             return@Button
@@ -385,7 +406,7 @@ fun EventFormDialog(
                                 location = location.trim(),
                                 date = date,
                                 type = selectedType,
-                                timeInfo = "$startTime - $endTime",
+                                timeInfo = "${startTime.trim()} - ${endTime.trim()}",
                                 city = city.trim(),
                                 participantEmails = initialEvent?.participantEmails ?: emptyList(),
                                 chatCount = initialEvent?.chatCount ?: 0L,
@@ -408,7 +429,7 @@ fun EventFormDialog(
                     }
                 }
             ) {
-                Text("Anuluj")
+                Text(stringResource(R.string.common_cancel))
             }
         }
     )
